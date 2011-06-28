@@ -9,7 +9,7 @@
  * @package		Migration
  * @author		Oliver Morgan, Raoul Lättemäe
  * @uses		DBForge
- * @copyright   (c) 2009 Oliver Morgan
+ * @copyright	 (c) 2009 Oliver Morgan
  * @copyright	(c) 2010 Raoul Lättemäe
  * @license		MIT
  */
@@ -117,7 +117,7 @@ class Migration_Jelly extends Migration {
 						}
 						$field = $meta->foreign_key();
 					}
-					
+
 					$column = Database_Column::factory('int');
 					$column->auto_increment = FALSE;
 					$column->name = $field;
@@ -135,13 +135,13 @@ class Migration_Jelly extends Migration {
 				$pivot->add_constraint(new Database_Constraint_Primary(
 					array_keys($pivot->columns()), $pivot->name
 				));
-				
+
 				/**
-				 * @todo It would be more than appropriate to add a contstraint in a following 
+				 * @todo It would be more than appropriate to add a contstraint in a following
 				 * form into a database:
 							ALTER TABLE `roles_users`
-						  ADD CONSTRAINT `roles_users_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-				 * 
+							ADD CONSTRAINT `roles_users_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+				 *
 				 */
 
 				// Add the pivot table to the list of tables
@@ -184,9 +184,46 @@ class Migration_Jelly extends Migration {
 			return;
 		}
 
-		//
-		switch (TRUE) 
+		// fetch rules
+		$rules = array();
+		foreach ($field->rules as $rule)
 		{
+			if (is_string($rule[0]))
+			{
+				$rules[$rule[0]] = (isset($rule[1])?$rule[1]:TRUE);
+			}
+		}
+
+		//
+		switch (TRUE)
+		{
+			// Texts
+			// before strings because text extends string
+			case ($field instanceof Jelly_Field_Text):
+			case ($field instanceof Jelly_Field_Serialized): // Handles serialized data
+				if (isset($rules['max_length'][1]))
+				{
+					$length = $rules['max_length'][1];
+					switch (TRUE)
+					{
+						case $length <= 65535:
+							$column = Database_Column::factory('text');
+							break;
+						case $length <= 16777215:
+							$column = Database_Column::factory('mediumtext');
+							break;
+						case $length <= 4294967295:
+							$column = Database_Column::factory('longtext');
+							break;
+					}
+				}
+				else
+				{
+					$column = Database_Column::factory('text');
+				}
+				// TODO: Ugly hack, fix it. (Text datatypes dont take parameters).
+				unset($column->max_length);
+				break;
 			// Strings
 			case ($field instanceof Jelly_Field_String):
 			case ($field instanceof Jelly_Field_File): // Saves file upload path
@@ -200,26 +237,27 @@ class Migration_Jelly extends Migration {
 				// Password is 40 char long Sha-1
 
 				// Create a new database column
+
 				$column = Database_Column::factory('varchar');
 				// Set the varchar's max length to a default of 64
-				
+
 				// @todo More appropriate would be to check length before...
-				
+
 				if(($field instanceof Jelly_Field_Email) OR ($field instanceof Jelly_Field_Slug))
 				{
 					$column->max_length = 255;
-				} 
+				}
 				elseif ($field instanceof Jelly_Field_Password)
 				{
 					$column->max_length = 255;
-				} 
-				
+				}
+
 				// @todo What is Jelly rules syntax? Is it in array or not?
-				elseif (empty($field->rules['max_length'][0]))
+				elseif (empty($rules['max_length'][1]))
 				{
 					$column->max_length = 64;
 				} else {
-					$column->max_length = $field->rules['max_length'][0];
+					$column->max_length = $rules['max_length'][1];
 				}
 				break;
 
@@ -239,32 +277,6 @@ class Migration_Jelly extends Migration {
 				$column->auto_increment = TRUE;
 				$column->unique = TRUE;
 				// $column->primary = TRUE;
-				break;
-				// Texts
-			case ($field instanceof Jelly_Field_Text):
-			case ($field instanceof Jelly_Field_Serialized): // Handles serialized data
-				if (isset($field->rules['max_length'][0]))
-				{
-					$lenght = $field->rules['max_length'][0];
-					switch (TRUE)
-					{
-						case $lenght <= 65535:
-							$column = Database_Column::factory('text');
-							break;
-						case $lenght <= 16777215:
-							$column = Database_Column::factory('mediumtext');
-							break;
-						case $lenght <= 4294967295:
-							$column = Database_Column::factory('longtext');
-							break;
-					}
-				} 
-				else 
-				{
-					$column = Database_Column::factory('text');
-				}
-				// TODO: Ugly hack, fix it. (Text datatypes dont take parameters).
-				unset($column->max_length);
 				break;
 				// Timestamps
 			case ($field instanceof Jelly_Field_Timestamp):
@@ -286,14 +298,14 @@ class Migration_Jelly extends Migration {
 				$column->name = $field->column;
 				if (!empty($field->default)) $column->default = $field->default;
 				if (!empty($field->null)) $column->nullable = (bool)$field->null;
-				
+
 				/**
 				 * @todo It would be appropriate to add a contstraint :
 							ALTER TABLE `roles_users`
-						  ADD CONSTRAINT `roles_users_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-				 * 
+							ADD CONSTRAINT `roles_users_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+				 *
 				 */
-				
+
 				return array($column);
 				break;
 			default:
@@ -305,7 +317,7 @@ class Migration_Jelly extends Migration {
 		if (!empty($field->default)) $column->default = $field->default;
 		if (!empty($field->null)) $column->nullable = (bool)$field->null;
 		if (!empty($field->unique)) $column->unique = $field->unique;
-		if (!empty($field->auto_increment)) $column->auto_increment  = $field->auto_increment;
+		if (!empty($field->auto_increment)) $column->auto_increment	= $field->auto_increment;
 		// The column is nullable if the field is not empty
 		// $column->nullable = $field->null;// ! $field->empty;
 		// $column->unique = $field->unique;
