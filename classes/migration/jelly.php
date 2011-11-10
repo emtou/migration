@@ -97,7 +97,7 @@ class Migration_Jelly extends Migration {
 				$pivot = new Database_Table($field->through['model'], $this->_db);
 
 				// Get fields
-				$columns = $field->through['columns'];
+				$columns = $field->through['fields'];
 
 				foreach ($columns as $field) {
 					// Chekt if the field names are defaults
